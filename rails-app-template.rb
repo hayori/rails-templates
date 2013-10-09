@@ -36,6 +36,7 @@ gem_group :development, :test do
   gem 'spring'
 
   gem 'rspec-rails'
+  gem 'capybara'
   gem 'factory_girl_rails'
 
   if @enable_guard
@@ -186,8 +187,8 @@ EOS
 
 # Setup ====================================================
 run 'bundle install'
-@after_bundler.each do |h| 
-  h.call; 
+@after_bundler.each do |h|
+  h.call;
 end
 
 # Enable rbenv local
