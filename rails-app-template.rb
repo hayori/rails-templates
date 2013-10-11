@@ -7,14 +7,10 @@ def after_bundler(&handler_block) @after_bundler << handler_block; end
 @enable_secret = yes?("enable dynamic secret? ") ? true : false
 
 gem 'therubyracer', platforms: :ruby
+gem "haml"
+gem "kaminari"
 
 gem_group :development do
-  # 高機能エラー画面
-  gem 'better_errors'
-
-  # 画面下にデバッグ情報を表示
-  gem 'rails-footnotes'
-
   # 多機能コンソール (binding.pryでデバッグ)
   gem 'pry-rails'
 
@@ -48,6 +44,7 @@ end
 
 after_bundler do
   generate 'rspec:install'
+  run "bundle exec guard init rspec"
 end
 
 # spec_helper.rb ====================================================
@@ -143,15 +140,6 @@ end
 EOS
 
 
-# footnotes.rb ====================================================
-footnotes_rb = <<-'EOS'
-if defined?(Footnotes) && Rails.env.development?
-  Footnotes.run! # first of all
-
-  # ... other init code
-end
-EOS
-
 # .gitignore ====================================================
 dot_gitignore = <<-'EOS'
 # Ignore bundler config.
@@ -212,10 +200,31 @@ if @enable_secret
   create_file 'config/initializers/secret_token.rb', secret_token_rb
 end
 
-create_file 'config/initializers/footnotes.rb', footnotes_rb
-
 remove_file '.gitignore'
 create_file '.gitignore', dot_gitignore
+
+# application.rb ======================================================
+# application メソッドに複数行の文字列渡すとインデントがおかしくなるので調整
+def application_multiline(data, options = {})
+  indent = options[:env] ? "  " : "    "
+  application data.gsub("\n", "\n#{indent}"), options
+end
+
+# rails g scaffold で使用する generator を指定
+# helper / css / js は生成しない
+application_multiline <<-RUBY
+config.generators do |g|
+  g.template_engine :haml
+  g.test_framework :rspec
+  g.controller_specs false
+  g.helper_specs false
+  g.view_specs false
+  g.helper false
+  g.stylesheets false
+  g.javascripts false
+end
+RUBY
+
 
 # Git ======================================================
 git :init
