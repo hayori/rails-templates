@@ -1,11 +1,15 @@
+template_path = "#{File.dirname(__FILE__)}/templates/"
+
 @after_bundler = []
 def after_bundler(&handler_block) @after_bundler << handler_block; end
 
 @app_name = app_name
 
-@enable_guard = yes?("y -> Guard, n -> Watchr? ") ? true : false
-@enable_secret = yes?("enable dynamic secret? ") ? true : false
+@enable_secret = yes?("Do you use dynamic secret? ") ? true : false
 
+# =========================
+# Gems
+# =========================
 gem 'therubyracer', platforms: :ruby
 gem "haml"
 gem "kaminari"
@@ -23,11 +27,9 @@ gem_group :development do
   # pryでのSQL結果を綺麗に表示
   gem 'hirb'
   gem 'hirb-unicode'
-
 end
 
 gem_group :development, :test do
-
   # sporkの代わり & 色々高速化
   gem 'spring'
 
@@ -35,92 +37,51 @@ gem_group :development, :test do
   gem 'capybara'
   gem 'factory_girl_rails'
 
-  if @enable_guard
-    gem 'guard-rspec'
-  else
-    gem 'watchr'
-  end
+  gem 'guard-rspec'
 end
 
 after_bundler do
   generate 'rspec:install'
+  remove_file "Guard"
   run "bundle exec guard init rspec"
 end
 
-# spec_helper.rb ====================================================
-spec_helper_rb = <<-'EOS'
-ENV["RAILS_ENV"] ||= 'test'
-require File.expand_path('../../config/environment', __FILE__)
-require 'rspec/rails'
-require 'rspec/autorun'
-require 'factory_girl'
 
-Dir[Rails.root.join('spec/support/**/*.rb')].each { |f| require f }
-
-ActiveRecord::Migration.check_pending! if defined?(ActiveRecord::Migration)
-
-RSpec.configure do |config|
-  config.use_transactional_fixtures = true
-  config.infer_base_class_for_anonymous_controllers = false
-  config.order = 'random'
-  config.include FactoryGirl::Syntax::Methods
-
-  config.before(:all) do
-    FactoryGirl.reload
-  end
-end
-EOS
-
-# Guard ====================================================
-guardfile = <<-'EOS'
-guard :rspec, spring: true do
-  watch(%r{^spec/.+_spec\.rb$})
-  watch(%r{^lib/(.+)\.rb$})     { |m| "spec/lib/#{m[1]}_spec.rb" }
-  watch('spec/spec_helper.rb')  { 'spec' }
-
-  watch(%r{^app/(.+)\.rb$})                           { |m| "spec/#{m[1]}_spec.rb" }
-  watch(%r{^app/(.*)(\.erb|\.haml)$})                 { |m| "spec/#{m[1]}#{m[2]}_spec.rb" }
-  watch(%r{^spec/factories/(.+)\.rb$})                { 'spec/factories_spec.rb' }
-  watch(%r{^spec/support/(.+)\.rb$})                  { 'spec' }
-  watch('config/routes.rb')                           { 'spec/routing' }
-  watch('app/controllers/application_controller.rb')  { 'spec/controllers' }
-end
-EOS
-
-# .watchr ====================================================
-dot_watchr = <<-'EOS'
-def run_spec(file)
-  unless File.exist?(file)
-    puts "#{file} does not exist"
-    return
-  end
-
-  puts "Running #{file}"
-  system "bundle exec spring rspec #{file}"
-  puts
+# =========================
+# bundle install
+# =========================
+run 'bundle install'
+@after_bundler.each do |h|
+  h.call;
 end
 
-watch("spec/.*/*_spec.rb") do |match|
-  run_spec match[0]
-end
 
-watch("app/(.*/.*).rb") do |match|
-  run_spec %{spec/#{match[1]}_spec.rb}
-end
-EOS
-
-
-# watchr.rake ====================================================
-watchr_rake = <<-'EOS'
-desc "Run watchr"
-task :watchr do
-  sh %{bundle exec watchr .watchr}
-end
-EOS
+# =========================
+# rbenv local
+# =========================
+# (ignored if rbenv is not installed.)
+rbenv_ruby = `rbenv version | cut -d' ' -f1`
+rbenv_ruby = DEFAULT_RUBY_VERSION unless $? == 0
+create_file '.rbenv-version', rbenv_ruby
 
 
-# secret_token.rb ====================================================
-secret_token_rb = <<-"EOS"
+# =========================
+# Config files
+# =========================
+
+# spec_helper.rb を置き換え
+remove_file "spec/spec_helper.rb"
+create_file "spec/spec_helper.rb", File.read(template_path + "spec_helper.rb")
+
+# .gitignore を置き換え
+remove_file '.gitignore'
+create_file '.gitignore', File.read(template_path + "gitignore")
+
+
+# =========================
+# secret_token.rb
+# =========================
+secret_token_rb = <<-"RUBY"
 require 'securerandom'
 
 def secure_token
@@ -136,74 +97,19 @@ def secure_token
   end
 end
 
-#{app_name}::Application.config.secret_key_base = secure_token
-EOS
-
-
-# .gitignore ====================================================
-dot_gitignore = <<-'EOS'
-# Ignore bundler config.
-/.bundle
-
-# Ignore the default SQLite database.
-/db/*.sqlite3
-/db/*.sqlite3-journal
-
-# Ignore all logfiles and tempfiles.
-/log/*.log
-/tmp
-
-# Ignore other unneeded files.
-doc/
-*.swp
-*~
-.project
-.DS_Store
-.idea
-.secret
-/coverage/
-/public/system/*
-/spec/tmp/*
-rerun.txt
-.rbenv-gemsets
-config/settings.local.yml
-config/settings/*.local.yml
-config/environments/*.local.yml
-/public/assets
-EOS
-
-
-# Setup ====================================================
-run 'bundle install'
-@after_bundler.each do |h|
-  h.call;
-end
-
-# Enable rbenv local
-# (ignored if rbenv is not installed.)
-rbenv_ruby = `rbenv version | cut -d' ' -f1`
-rbenv_ruby = DEFAULT_RUBY_VERSION unless $? == 0
-create_file '.rbenv-version', rbenv_ruby
-
-remove_file 'spec/spec_helper.rb'
-create_file 'spec/spec_helper.rb', spec_helper_rb
-
-if @enable_guard
-  create_file 'Guardfile', guardfile
-else
-  create_file '.watchr', dot_watchr
-  create_file 'lib/tasks/watchr.rake', watchr_rake
-end
+#{app_name.capitalize}::Application.config.secret_key_base = secure_token
+RUBY
 
 if @enable_secret
+  # token自動生成スクリプを追加
   remove_file 'config/initializers/secret_token.rb'
-  create_file 'config/initializers/secret_token.rb', secret_token_rb
+  initializer "secret_token.rb", secret_token_rb
 end
 
-remove_file '.gitignore'
-create_file '.gitignore', dot_gitignore
 
-# application.rb ======================================================
+# =========================
+# application.rb
+# =========================
 # application メソッドに複数行の文字列渡すとインデントがおかしくなるので調整
 def application_multiline(data, options = {})
   indent = options[:env] ? "  " : "    "
@@ -226,10 +132,12 @@ end
 RUBY
 
 
-# Git ======================================================
+# =========================
+# Git
+# =========================
 git :init
-git :add => '.'
-git :commit => '-am "Initial commit"'
+# git :add => '.'
+# git :commit => '-am "Initial commit"'
 
 # if @deploy_via_remote && @remote_repo
 #   git :remote => "add origin #@remote_repo"
