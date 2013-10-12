@@ -136,8 +136,8 @@ RUBY
 # Git
 # =========================
 git :init
-# git :add => '.'
-# git :commit => '-am "Initial commit"'
+git :add => '.'
+git :commit => '-am "Initial commit"'
 
 # if @deploy_via_remote && @remote_repo
 #   git :remote => "add origin #@remote_repo"
