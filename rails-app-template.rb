@@ -11,7 +11,7 @@ def after_bundler(&handler_block) @after_bundler << handler_block; end
 # Gems
 # =========================
 gem 'therubyracer', platforms: :ruby
-gem "haml"
+gem "haml-rails"
 gem "kaminari"
 
 gem_group :development do
