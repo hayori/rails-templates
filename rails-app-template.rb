@@ -30,9 +30,6 @@ gem_group :development do
 end
 
 gem_group :development, :test do
-  # sporkの代わり & 色々高速化
-  gem 'spring'
-
   gem 'rspec-rails'
   gem 'capybara'
   gem 'factory_girl_rails'
